@@ -261,25 +261,31 @@ router.get('/get/novelById/:id', (req, res) => {
 router.delete('/delete/novel/:novelId', (req, res) => {
   const { novelId } = req.params;
 
-  db.query(`DELETE FROM novel_genre WHERE novel_id = '${novelId}'`, (err, result) => {
+  db.query(`DELETE FROM volumes WHERE novel_id = '${novelId}'`, (err, result) => {
     if (err) {
       console.log(err);
       res.status(500).send('Internal server error');
-    } else {
-      db.query(`DELETE FROM novels WHERE novel_id = '${novelId}'`, (err, result) => {
+    } else
+      db.query(`DELETE FROM novel_genre WHERE novel_id = '${novelId}'`, (err, result) => {
         if (err) {
           console.log(err);
           res.status(500).send('Internal server error');
-        } else if (result.affectedRows === 0) {
-          res.status(404).send('Novel not found');
         } else {
-          console.log(`Deleted ${result.affectedRows} row(s) from novels.`);
-          res.status(200).json({ ok: true });
-          
+          db.query(`DELETE FROM novels WHERE novel_id = '${novelId}'`, (err, result) => {
+            if (err) {
+              console.log(err);
+              res.status(500).send('Internal server error');
+            } else if (result.affectedRows === 0) {
+              res.status(404).send('Novel not found');
+            } else {
+              console.log(`Deleted ${result.affectedRows} row(s) from novels.`);
+              res.status(200).json({ ok: true });
+              
+            }
+          });
         }
       });
-    }
-  });
+    });
 });
 
 router.get('/get/novelWithGenre/:id', (req, res) => {
@@ -399,10 +405,10 @@ router.delete('/delete/genre/:id', (req, res) => {
 });
 
 router.post('/post/newVolume', (req, res) => {
-  const { volume_title, cover_image, novel_id } = req.body;
+  const { volume_title, cover_image, novels } = req.body;
 
   const query = 'INSERT INTO volumes (volume_title, cover_image, novel_id, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())';
-  const values = [volume_title, cover_image, novel_id];
+  const values = [volume_title, cover_image, novels];
 
   db.query(query, values, (error, results) => {
     if (error) {
@@ -410,6 +416,108 @@ router.post('/post/newVolume', (req, res) => {
       res.status(500).send("Internal Server Error");
     } else {
       res.status(200).json({ ok: true });
+    }
+  });
+});
+
+router.get('/get/volumeById/:id', (req, res) => {
+  const volumeId = req.params.id;
+
+  db.query(`SELECT volumes.volume_id, volumes.volume_title, volumes.cover_image, 
+                   novels.title AS novels, volumes.created_at, volumes.updated_at
+            FROM volumes 
+            INNER JOIN novels ON volumes.novel_id = novels.novel_id
+            WHERE volumes.volume_id = ${volumeId}`, (err, result) => {
+    if (err) {
+      console.log(err);
+      res.status(500).send('Internal server error');
+    } else if (result.length === 0) {
+      res.status(404).send('Volume not found');
+    } else {
+      const volume = {
+        volume_id: result[0].volume_id,
+        volume_title: result[0].volume_title,
+        cover_image: result[0].cover_image,
+        novels: result[0].novels,
+        created_at: result[0].created_at,
+        updated_at: result[0].updated_at,
+      };
+
+      res.send(volume);
+    }
+  });
+});
+
+router.put('/put/volume/:id', (req, res) => {
+  const volumeId = req.params.id;
+
+  // Lấy dữ liệu mới từ client
+  const { volume_title, cover_image, novels, } = req.body;
+
+  db.query(
+    `UPDATE volumes 
+     SET volume_title = ?, cover_image = ?, novel_id = ?, updated_at = NOW()
+     WHERE volume_id = ?`,
+    [volume_title, cover_image, novels, volumeId],
+    (err, result) => {
+      if (err) {
+        console.log(err);
+        res.status(500).send('Internal server error');
+      } else if (result.affectedRows === 0) {
+        res.status(404).send('Volume not found');
+      } else {
+        res.status(200).json({ ok: true });
+      }
+    }
+  );
+});
+
+router.get('/get/chaptersByVolumeId/:id', (req, res) => {
+  const volumeId = req.params.id;
+
+  db.query(`SELECT *
+            FROM chapters 
+            WHERE volume_id = ${volumeId}`, (err, chaptersResult) => {
+    if (err) {
+      console.log(err);
+      res.status(500).send('Internal server error');
+    } else if (chaptersResult.length === 0) {
+      res.status(404).send('Chapters not found');
+    } else {
+      const chapters = chaptersResult.map((chapter: any) => {
+        return {
+          chapter_id: chapter.chapter_id,
+          title: chapter.title,
+          volume_id: chapter.volume_id,
+          content: chapter.content,
+          created_id: chapter.created_id,
+          updated_id: chapter.updated_id,
+        }
+      });
+
+      res.send(chapters);
+    }
+  });
+});
+
+router.delete('/delete/volume/:id', (req, res) => {
+  const volumeId = req.params.id;
+
+  // Xóa các bản ghi trong bảng chapters có volume_id tương ứng
+  db.query(`DELETE FROM chapters WHERE volume_id = ${volumeId}`, (err) => {
+    if (err) {
+      console.log(err);
+      res.status(500).send('Internal server error');
+    } else {
+      // Xóa volume có id tương ứng
+      db.query(`DELETE FROM volumes WHERE volume_id = ${volumeId}`, (err) => {
+        if (err) {
+          console.log(err);
+          res.status(500).send('Internal server error');
+        } else {
+          res.status(200).json({ ok: true });
+        }
+      });
     }
   });
 });
