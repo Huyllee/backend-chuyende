@@ -119,12 +119,39 @@ router.get('/get/novels/:genre', (req, res) => {
   });
 
   router.get('/get/novel/chapters', (req, res) => {
-    // const id = req.params.id;
     const sql = `select * from chapters`;
   
     db.query(sql, (error, results, fields) => {
       if (error) throw error;
       res.send(results);
+    });
+  });
+
+  router.get('/get/audio/:id', (req, res) => {
+    const chapterId = req.params.id;
+  
+    db.query(`SELECT *
+              FROM audio
+              WHERE chapter_id = ${chapterId}`, (err, audioResult) => {
+      if (err) {
+        console.log(err);
+        res.status(500).send('Internal server error');
+      } else if (audioResult.length === 0) {
+        res.status(404).send('Audio not found');
+      } else {
+        const audio = audioResult.map((audio: any) => {
+          return {
+            audio_id: audio.audio_id,
+            chapter_id: audio.chapter_id,
+            title: audio.title,
+            url: audio.url,
+            created_at: audio.created_at,
+            updated_at: audio.updated_at,
+          }
+        });
+  
+        res.send(audio);
+      }
     });
   });
 
@@ -511,6 +538,106 @@ router.delete('/delete/volume/:id', (req, res) => {
     } else {
       // Xóa volume có id tương ứng
       db.query(`DELETE FROM volumes WHERE volume_id = ${volumeId}`, (err) => {
+        if (err) {
+          console.log(err);
+          res.status(500).send('Internal server error');
+        } else {
+          res.status(200).json({ ok: true });
+        }
+      });
+    }
+  });
+});
+
+router.get('/get/chapterById/:id', (req, res) => {
+  const chapterId = req.params.id;
+
+  db.query(`SELECT chapters.chapter_id, chapters.title, chapters.content, chapters.volume_id, volumes.volume_title
+            FROM chapters 
+            JOIN volumes ON chapters.volume_id = volumes.volume_id
+            WHERE chapter_id = ${chapterId}`, (err, chapterResult) => {
+    if (err) {
+      console.log(err);
+      res.status(500).send('Internal server error');
+    } else if (chapterResult.length === 0) {
+      res.status(404).send('Chapter not found');
+    } else {
+      const chapter = {
+        chapter_id: chapterResult[0].chapter_id,
+        title: chapterResult[0].title,
+        content: chapterResult[0].content,
+        volume_title: chapterResult[0].volume_title,
+        volume: chapterResult[0].volume_id,
+      };
+
+      res.send(chapter);
+    }
+  });
+});
+
+router.post('/post/newChapter', (req, res) => {
+  const { title, content, volume } = req.body;
+
+  db.query(`SELECT * FROM volumes WHERE volume_id = ${volume}`, (volumeErr, volumeResult) => {
+    if (volumeErr) {
+      console.log(volumeErr);
+      res.status(500).send('Internal server error');
+    } else if (volumeResult.length === 0) {
+      res.status(404).send('Volume not found');
+    } else {
+      db.query(`INSERT INTO chapters (title, content, volume_id, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())`, [title, content, volume], (err, result) => {
+        if (err) {
+          console.log(err);
+          res.status(500).send('Internal server error');
+        } else {
+          const newChapter = {
+            chapter_id: result.insertId,
+            title: title,
+            content: content,
+            volume: volume
+          };
+          res.status(200).json({ ok: true });
+        }
+      });
+    }
+  });
+});
+
+router.put('/put/chapter/:id', (req, res) => {
+  const chapterId = req.params.id;
+
+  // Lấy dữ liệu mới từ client
+  const { volume, title, content, } = req.body;
+
+  db.query(
+    `UPDATE chapters 
+     SET volume_id = ?, title = ?, content = ?, updated_at = NOW()
+     WHERE chapter_id = ?`,
+    [volume, title, content, chapterId],
+    (err, result) => {
+      if (err) {
+        console.log(err);
+        res.status(500).send('Internal server error');
+      } else if (result.affectedRows === 0) {
+        res.status(404).send('Volume not found');
+      } else {
+        res.status(200).json({ ok: true });
+      }
+    }
+  );
+});
+
+router.delete('/delete/chapter/:id', (req, res) => {
+  const chapterId = req.params.id;
+
+  // Delete all audios with corresponding chapter_id first
+  db.query(`DELETE FROM audio WHERE chapter_id = ${chapterId}`, (err) => {
+    if (err) {
+      console.log(err);
+      res.status(500).send('Internal server error');
+    } else {
+      // If audios are deleted successfully, delete the chapter
+      db.query(`DELETE FROM chapters WHERE chapter_id = ${chapterId}`, (err) => {
         if (err) {
           console.log(err);
           res.status(500).send('Internal server error');
