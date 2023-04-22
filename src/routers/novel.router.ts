@@ -135,9 +135,9 @@ router.get('/get/novels/:genre', (req, res) => {
               WHERE chapter_id = ${chapterId}`, (err, audioResult) => {
       if (err) {
         console.log(err);
-        res.status(500).send('Internal server error');
+        return res.status(500).send('Internal server error');
       } else if (audioResult.length === 0) {
-        res.status(404).send('Audio not found');
+        return res.status(404).send('Audio not found');
       } else {
         const audio = audioResult.map((audio: any) => {
           return {
@@ -158,15 +158,17 @@ router.get('/get/novels/:genre', (req, res) => {
 router.post('/post/favorites', (
   (req, res) => {
    const {user_id, novel_id} = req.body;
+   const novelId = novel_id;
    const query = `SELECT * FROM favorites WHERE novel_id = ? and user_id = ?`;
-   const values = [user_id, novel_id];
+   const values = [novelId, user_id];
 
    db.query(query, values, async (error, results) => {
      if (error) {
        console.log(error);
-       res.status(500).send("Internal Server Error");
+       return res.status(500).send("Internal Server Error");
      } else if (results.length > 0) {
-       res.status(HTTP_BAD_REQUEST).send("Truyện đã được theo dõi!");
+       res.json({ ok: false });
+      //  res.status(HTTP_BAD_REQUEST).send("Truyện đã được theo dõi!");
      } else {
        const query = 'INSERT INTO favorites (user_id, novel_id, created_at, updated_at) VALUES (?, ?, NOW(), NOW())';
        const values = [user_id, novel_id];
@@ -174,19 +176,133 @@ router.post('/post/favorites', (
        db.query(query, values, async (error, results) => {
          if (error) {
            console.log(error);
-           res.status(500).send("Internal Server Error");
+           return res.status(500).send("Internal Server Error");
          } else {
            const dbFavorites = {
              id: results.insertId,
              user_id,
              novel_id,
            };
+           res.status(200).json({ ok: true });
          }
        });
      }
    });
  }
 ));
+
+router.delete('/delete/favorite/:favoriteId', (req, res) => {
+  const favoriteId = req.params.favoriteId;
+
+  const query = 'DELETE FROM favorites WHERE favorite_id = ?';
+  const values = [favoriteId];
+
+  db.query(query, values, (error, results) => {
+    if (error) {
+      console.log(error);
+      return res.status(500).send("Internal Server Error");
+    } else if (results.affectedRows === 0) {
+      return res.status(404).send("Favorite not found");
+    } else {
+      res.status(200).json({ ok: true });
+    }
+  });
+});
+
+router.post('/post/rating', (
+  (req, res) => {
+   const {user_id, novel_id, rating_value} = req.body;
+   const query = `SELECT * FROM ratings WHERE user_id = ? AND novel_id = ?`;
+   const values = [user_id, novel_id];
+
+   db.query(query, values, async (error, results) => {
+     if (error) {
+       console.log(error);
+       return res.status(500).send("Internal Server Error");
+     } else if (results.length > 0) {
+       res.json({ ok: false });
+      //  res.status(HTTP_BAD_REQUEST).send("Truyện đã được theo dõi!");
+     } else {
+       const query = 'INSERT INTO ratings (user_id, novel_id, rating_value, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())';
+       const values = [user_id, novel_id, rating_value];
+
+       db.query(query, values, async (error, results) => {
+         if (error) {
+           console.log(error);
+           return res.status(500).send("Internal Server Error");
+         } else {
+           const dbRatings = {
+             id: results.insertId,
+             user_id,
+             novel_id,
+           };
+           res.status(200).json({ ok: true });
+         }
+       });
+     }
+   });
+ }
+));
+
+router.get('/get/ratings/:novelId/:userId', (req, res) => {
+  const novelId = req.params.novelId;
+  const userId = req.params.userId;
+  
+  const query = 'SELECT * FROM ratings WHERE novel_id = ? AND user_id = ?';
+  const values = [novelId, userId];
+
+  db.query(query, values, (error, results) => {
+    if (error) {
+      console.log(error);
+      return res.status(500).send('Internal Server Error');
+    } else {
+      res.json(results);
+    }
+  });
+});
+
+router.put('/update/ratings/:novelId/:userId', (req, res) => {
+  const { novelId, userId } = req.params;
+  const { RatingObj } = req.body;
+
+  const query = `UPDATE ratings SET rating_value = ${RatingObj}, novel_id = ${novelId}, user_id = ${userId}, updated_at = NOW() WHERE novel_id = ${novelId} AND user_id = ${userId}`;
+
+  db.query(query, (err, results) => {
+    if (err) {
+      console.log(err);
+      return res.status(500).send('Internal server error');
+    } else if (results.affectedRows === 0) {
+      return res.status(404).send('Rating not found');
+    } else {
+      res.status(200).json({ ok: true });
+    }
+  });
+});
+
+router.get('/get/favorites/:id', (req, res) => {
+  const id = req.params.id;
+  const sql = `SELECT * FROM favorites
+              WHERE novel_id = ?`;
+
+  db.query(sql, [id], (error, results, fields) => {
+    if (error) throw error;
+    res.send(results);
+  });
+});
+
+router.get('/get/favoriteById/:userId', (req, res) => {
+  const { userId } = req.params;
+  const query = `SELECT * FROM novels LEFT JOIN favorites ON novels.novel_id = favorites.novel_id WHERE favorites.user_id = ?`;
+
+  db.query(query, userId, (err, results) => {
+    if (err) {
+      console.log(err);
+      return res.status(500).send('Internal server error');
+    } else {
+      res.send(results);
+    }
+  });
+});
 
 
 /* api router Admin */
@@ -202,14 +318,14 @@ router.post('/post/newNovel', (req, res) => {
     VALUES ('${title}', '${author}', '${artist}', '${description}', '${cover_image}', NOW(), NOW())`, (err, result) => {
     if (err) {
       console.log(err);
-      res.status(500).send('Internal server error');
+      return res.status(500).send('Internal server error');
     } else {
       const novel_id = result.insertId;
       for (const category_id of categories_id) {
         db.query(`INSERT INTO novel_genre (novel_id, category_id) VALUES ('${novel_id}', '${category_id}')`, (err, result) => {
           if (err) {
             console.log(err);
-            res.status(500).send('Internal server error');
+            return res.status(500).send('Internal server error');
           } else {
             console.log(`Inserted ${result.affectedRows} row(s) into novel_genre.`);
           }
@@ -231,18 +347,18 @@ router.put('/put/novel/:novelId', (req, res) => {
   db.query(`UPDATE novels SET title = '${title}', author = '${author}', artist = '${artist}', description = '${description}', cover_image = '${cover_image}', updated_at = NOW() WHERE novel_id = '${novelId}'`, (err, result) => {
     if (err) {
       console.log(err);
-      res.status(500).send('Internal server error');
+      return res.status(500).send('Internal server error');
     } else {
       db.query(`DELETE FROM novel_genre WHERE novel_id = '${novelId}'`, (err, result) => {
         if (err) {
           console.log(err);
-          res.status(500).send('Internal server error');
+          return res.status(500).send('Internal server error');
         } else {
           for (const category_id of categories_id) {
             db.query(`INSERT INTO novel_genre (novel_id, category_id) VALUES ('${novelId}', '${category_id}')`, (err, result) => {
               if (err) {
                 console.log(err);
-                res.status(500).send('Internal server error');
+                return res.status(500).send('Internal server error');
               } else {
                 console.log(`Inserted ${result.affectedRows} row(s) into novel_genre.`);
               }
@@ -265,9 +381,9 @@ router.get('/get/novelById/:id', (req, res) => {
             GROUP BY novels.novel_id`, (err, novelsResult) => {
     if (err) {
       console.log(err);
-      res.status(500).send('Internal server error');
+      return res.status(500).send('Internal server error');
     } else if (novelsResult.length === 0) {
-      res.status(404).send('Novel not found');
+      return res.status(404).send('Novel not found');
     } else {
       const novel = {
         title: novelsResult[0].title,
@@ -291,7 +407,7 @@ router.delete('/delete/novel/:novelId', (req, res) => {
   db.query(`DELETE FROM volumes WHERE novel_id = '${novelId}'`, (err, result) => {
     if (err) {
       console.log(err);
-      res.status(500).send('Internal server error');
+      return res.status(500).send('Internal server error');
     } else
       db.query(`DELETE FROM novel_genre WHERE novel_id = '${novelId}'`, (err, result) => {
         if (err) {
@@ -301,9 +417,9 @@ router.delete('/delete/novel/:novelId', (req, res) => {
           db.query(`DELETE FROM novels WHERE novel_id = '${novelId}'`, (err, result) => {
             if (err) {
               console.log(err);
-              res.status(500).send('Internal server error');
+              return res.status(500).send('Internal server error');
             } else if (result.affectedRows === 0) {
-              res.status(404).send('Novel not found');
+              return res.status(404).send('Novel not found');
             } else {
               console.log(`Deleted ${result.affectedRows} row(s) from novels.`);
               res.status(200).json({ ok: true });
@@ -325,9 +441,9 @@ router.get('/get/novelWithGenre/:id', (req, res) => {
             GROUP BY novels.novel_id`, (err, novelsResult) => {
     if (err) {
       console.log(err);
-      res.status(500).send('Internal server error');
+      return res.status(500).send('Internal server error');
     } else if (novelsResult.length === 0) {
-      res.status(404).send('Novel not found');
+      return res.status(404).send('Novel not found');
     } else {
       const novel = {
         novel_id: novelsResult[0].novel_id,
@@ -342,7 +458,7 @@ router.get('/get/novelWithGenre/:id', (req, res) => {
       db.query(`SELECT * FROM novel_categories`, (err, categoriesResult) => {
         if (err) {
           console.log(err);
-          res.status(500).send('Internal server error');
+          return res.status(500).send('Internal server error');
         } else {
           const categoriesMap = new Map();
           categoriesResult.forEach((category: any) => {
@@ -368,7 +484,7 @@ router.post('/post/newGenre', (req, res) => {
   db.query(query, values, (error, results) => {
     if (error) {
       console.log(error);
-      res.status(500).send('Internal Server Error');
+      return res.status(500).send('Internal Server Error');
     } else {
       res.status(200).json({ ok: true });
     }
@@ -381,9 +497,9 @@ router.get('/get/genreById/:id', (req, res) => {
   db.query(`SELECT * FROM novel_categories WHERE category_id = ?`, [category_id], (err, result) => {
     if (err) {
       console.log(err);
-      res.status(500).send('Internal server error');
+      return res.status(500).send('Internal server error');
     } else if (result.length === 0) {
-      res.status(404).send('Category not found');
+      return res.status(404).send('Category not found');
     } else {
       res.send(result[0]);
     }
@@ -400,9 +516,9 @@ router.put('/put/genre/:id', (req, res) => {
   db.query(query, values, (err, results) => {
     if (err) {
       console.log(err);
-      res.status(500).send('Internal server error');
+      return res.status(500).send('Internal server error');
     } else if (results.affectedRows === 0) {
-      res.status(404).send('Category not found');
+      return res.status(404).send('Category not found');
     } else {
       res.status(200).json({ ok: true });
     }
@@ -417,12 +533,12 @@ router.delete('/delete/genre/:id', (req, res) => {
   db.query(deleteGenreQuery, category_id, (err, genreResult) => {
     if (err) {
       console.log(err);
-      res.status(500).send('Internal server error');
+      return res.status(500).send('Internal server error');
     } else {
       db.query(deleteCategoryQuery, category_id, (err, categoryResult) => {
         if (err) {
           console.log(err);
-          res.status(500).send('Internal server error');
+          return res.status(500).send('Internal server error');
         } else {
           res.status(200).json({ ok: true });
         }
@@ -440,7 +556,7 @@ router.post('/post/newVolume', (req, res) => {
   db.query(query, values, (error, results) => {
     if (error) {
       console.log(error);
-      res.status(500).send("Internal Server Error");
+      return res.status(500).send("Internal Server Error");
     } else {
       res.status(200).json({ ok: true });
     }
@@ -457,9 +573,9 @@ router.get('/get/volumeById/:id', (req, res) => {
             WHERE volumes.volume_id = ${volumeId}`, (err, result) => {
     if (err) {
       console.log(err);
-      res.status(500).send('Internal server error');
+      return res.status(500).send('Internal server error');
     } else if (result.length === 0) {
-      res.status(404).send('Volume not found');
+      return res.status(404).send('Volume not found');
     } else {
       const volume = {
         volume_id: result[0].volume_id,
@@ -489,9 +605,9 @@ router.put('/put/volume/:id', (req, res) => {
     (err, result) => {
       if (err) {
         console.log(err);
-        res.status(500).send('Internal server error');
+        return res.status(500).send('Internal server error');
       } else if (result.affectedRows === 0) {
-        res.status(404).send('Volume not found');
+        return res.status(404).send('Volume not found');
       } else {
         res.status(200).json({ ok: true });
       }
@@ -507,9 +623,9 @@ router.get('/get/chaptersByVolumeId/:id', (req, res) => {
             WHERE volume_id = ${volumeId}`, (err, chaptersResult) => {
     if (err) {
       console.log(err);
-      res.status(500).send('Internal server error');
+      return res.status(500).send('Internal server error');
     } else if (chaptersResult.length === 0) {
-      res.status(404).send('Chapters not found');
+      return res.status(404).send('Chapters not found');
     } else {
       const chapters = chaptersResult.map((chapter: any) => {
         return {
@@ -534,13 +650,13 @@ router.delete('/delete/volume/:id', (req, res) => {
   db.query(`DELETE FROM chapters WHERE volume_id = ${volumeId}`, (err) => {
     if (err) {
       console.log(err);
-      res.status(500).send('Internal server error');
+      return res.status(500).send('Internal server error');
     } else {
       // Xóa volume có id tương ứng
       db.query(`DELETE FROM volumes WHERE volume_id = ${volumeId}`, (err) => {
         if (err) {
           console.log(err);
-          res.status(500).send('Internal server error');
+          return res.status(500).send('Internal server error');
         } else {
           res.status(200).json({ ok: true });
         }
@@ -558,9 +674,9 @@ router.get('/get/chapterById/:id', (req, res) => {
             WHERE chapter_id = ${chapterId}`, (err, chapterResult) => {
     if (err) {
       console.log(err);
-      res.status(500).send('Internal server error');
+      return res.status(500).send('Internal server error');
     } else if (chapterResult.length === 0) {
-      res.status(404).send('Chapter not found');
+      return res.status(404).send('Chapter not found');
     } else {
       const chapter = {
         chapter_id: chapterResult[0].chapter_id,
@@ -581,14 +697,14 @@ router.post('/post/newChapter', (req, res) => {
   db.query(`SELECT * FROM volumes WHERE volume_id = ${volume}`, (volumeErr, volumeResult) => {
     if (volumeErr) {
       console.log(volumeErr);
-      res.status(500).send('Internal server error');
+      return res.status(500).send('Internal server error');
     } else if (volumeResult.length === 0) {
-      res.status(404).send('Volume not found');
+      return res.status(404).send('Volume not found');
     } else {
       db.query(`INSERT INTO chapters (title, content, volume_id, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())`, [title, content, volume], (err, result) => {
         if (err) {
           console.log(err);
-          res.status(500).send('Internal server error');
+          return res.status(500).send('Internal server error');
         } else {
           const newChapter = {
             chapter_id: result.insertId,
@@ -617,9 +733,9 @@ router.put('/put/chapter/:id', (req, res) => {
     (err, result) => {
       if (err) {
         console.log(err);
-        res.status(500).send('Internal server error');
+        return res.status(500).send('Internal server error');
       } else if (result.affectedRows === 0) {
-        res.status(404).send('Volume not found');
+        return res.status(404).send('Volume not found');
       } else {
         res.status(200).json({ ok: true });
       }
@@ -634,13 +750,13 @@ router.delete('/delete/chapter/:id', (req, res) => {
   db.query(`DELETE FROM audio WHERE chapter_id = ${chapterId}`, (err) => {
     if (err) {
       console.log(err);
-      res.status(500).send('Internal server error');
+      return res.status(500).send('Internal server error');
     } else {
       // If audios are deleted successfully, delete the chapter
       db.query(`DELETE FROM chapters WHERE chapter_id = ${chapterId}`, (err) => {
         if (err) {
           console.log(err);
-          res.status(500).send('Internal server error');
+          return res.status(500).send('Internal server error');
         } else {
           res.status(200).json({ ok: true });
         }
@@ -726,7 +842,7 @@ router.post('/post/newCategory', (req, res) => {
   db.query(`INSERT INTO novel_categories (category_name, created_at, updated_at) VALUES ('${category_name}', NOW(), NOW())`, (err, result) => {
     if (err) {
       console.log(err);
-      res.status(500).send('Internal server error');
+      return res.status(500).send('Internal server error');
     } else {
       console.log(`Inserted ${result.affectedRows} row(s) into novel_categories.`);
       res.send('Category created successfully');
