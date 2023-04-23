@@ -244,6 +244,13 @@ router.post('/post/rating', (
  }
 ));
 
+router.get('/get/allRatings', function(req, res) {
+  db.query(`SELECT * FROM ratings`, function(error, results, fields) {
+    if (error) throw error;
+    res.send(results);
+  });
+});
+
 router.get('/get/ratings/:novelId/:userId', (req, res) => {
   const novelId = req.params.novelId;
   const userId = req.params.userId;
@@ -319,6 +326,16 @@ router.get('/get/newChapters', (req, res) => {
   db.query(sql, (err, result) => {
     if (err) throw err;
     res.json(result);
+  });
+});
+
+router.get('/get/topRatings', function(req, res) {
+  db.query(`SELECT n.novel_id, n.title, n.cover_image, IFNULL(AVG(r.rating_value), 0) AS avg_rating
+            FROM novels AS n
+            LEFT JOIN ratings AS r ON n.novel_id = r.novel_id
+            GROUP BY n.novel_id`, function(error, results, fields) {
+    if (error) throw error;
+    res.send(results);
   });
 });
 
