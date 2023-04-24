@@ -329,6 +329,31 @@ router.get('/get/newChapters', (req, res) => {
   });
 });
 
+router.get('/get/novelByTag/:tag', (req, res) => {
+  const { tag } = req.params;
+  const sql = `SELECT c.* , v.volume_title, n.novel_id, n.title as novel_title, n.cover_image
+                FROM chapters AS c 
+                INNER JOIN volumes AS v ON c.volume_id = v.volume_id 
+                INNER JOIN novels AS n ON n.novel_id = v.novel_id
+                INNER JOIN (
+                    SELECT MAX(c2.updated_at) as max_date, v2.novel_id
+                    FROM chapters AS c2
+                    INNER JOIN volumes AS v2 ON c2.volume_id = v2.volume_id
+                    GROUP BY v2.novel_id
+                ) as m ON v.novel_id = m.novel_id AND c.updated_at = m.max_date
+                INNER JOIN novel_genre AS ng ON ng.novel_id = n.novel_id
+                INNER JOIN novel_categories AS nc ON nc.category_id = ng.category_id AND nc.category_name = ?
+                ORDER BY c.updated_at DESC`;
+  db.query(sql, tag, (err, results) => {
+    if (err) {
+      console.log(err);
+      return res.status(500).send('Internal server error');
+    } else {
+      res.send(results);
+    }
+  });
+});
+
 router.get('/get/topRatings', function(req, res) {
   db.query(`SELECT n.novel_id, n.title, n.cover_image, IFNULL(AVG(r.rating_value), 0) AS avg_rating
             FROM novels AS n
