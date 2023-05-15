@@ -752,7 +752,7 @@ router.get('/get/chapterById/:id', (req, res) => {
 });
 
 router.post('/post/newChapter', (req, res) => {
-  const { title, content, volume } = req.body;
+  const { title, content, volume, audio } = req.body;
 
   db.query(`SELECT * FROM volumes WHERE volume_id = ${volume}`, (volumeErr, volumeResult) => {
     if (volumeErr) {
@@ -766,14 +766,17 @@ router.post('/post/newChapter', (req, res) => {
           console.log(err);
           return res.status(500).send('Internal server error');
         } else {
-          const newChapter = {
-            chapter_id: result.insertId,
-            title: title,
-            content: content,
-            volume: volume
-          };
-          res.status(200).json({ ok: true });
-        }
+          const chapter_id = result.insertId;
+          db.query(`INSERT INTO audio (chapter_id, title, url, created_at, updated_at) VALUES ('${chapter_id}', '${title}', '${audio}', NOW(), NOW())`, (err, result) => {
+            if (err) {
+              console.log(err);
+              return res.status(500).send('Internal server error');
+            } else {
+              console.log(`Inserted ${result.affectedRows} row(s) into audio.`);
+            }
+          });
+        res.status(200).json({ ok: true });
+    }
       });
     }
   });

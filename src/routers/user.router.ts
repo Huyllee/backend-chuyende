@@ -196,6 +196,33 @@ router.post('/register', (
     }
   ));
 
+  router.post("/login-admin", (req, res) => {
+    const {email, password} = req.body;
+    const query = `SELECT * FROM users WHERE email = ?`;
+    const values = [email];
+
+    db.query(query, values, async (error, results) => {
+        if (error) {
+            console.log(error);
+            res.status(500).send("Internal Server Error");
+        } else if (results.length === 0 || results[0].role === '2') {
+            res.status(HTTP_BAD_REQUEST).send("Username or password not valid!");
+        } else {
+            const user = results[0];
+            if(await bcrypt.compare(password, user.password)) {
+              const dbUser = {
+                user_id: user.user_id,
+                email: user.email,
+                full_name: user.full_name,
+                role: user.role
+            }
+              res.send(generateTokenResponse(dbUser));
+            } 
+        }
+    });
+});
+
+
 const generateTokenResponse = (user:any) => {
     const token = jwt.sign({
       user_id: user.user_id, email:user.email, role:user.role
