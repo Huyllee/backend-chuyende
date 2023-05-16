@@ -188,7 +188,7 @@ router.post('/register', (
                 full_name,
                 role: 2,
               };
-              res.send(generateTokenResponse(dbUser));
+              return res.send(generateTokenResponse(dbUser));
             }
           });
         }
@@ -205,8 +205,8 @@ router.post('/register', (
         if (error) {
             console.log(error);
             res.status(500).send("Internal Server Error");
-        } else if (results.length === 0 || results[0].role === '2') {
-            res.status(HTTP_BAD_REQUEST).send("Username or password not valid!");
+        } else if (results.length === 0 || results[0].role === 2) {
+            return res.status(HTTP_BAD_REQUEST).send("Username or password not valid!");
         } else {
             const user = results[0];
             if(await bcrypt.compare(password, user.password)) {
@@ -216,7 +216,7 @@ router.post('/register', (
                 full_name: user.full_name,
                 role: user.role
             }
-              res.send(generateTokenResponse(dbUser));
+            return res.send(generateTokenResponse(dbUser));
             } 
         }
     });
