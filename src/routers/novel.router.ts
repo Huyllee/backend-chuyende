@@ -244,6 +244,13 @@ router.post('/post/rating', (
  }
 ));
 
+router.get('/get/allRatings', function(req, res) {
+  db.query(`SELECT * FROM ratings`, function(error, results, fields) {
+    if (error) throw error;
+    res.send(results);
+  });
+});
+
 router.get('/get/ratings/:novelId/:userId', (req, res) => {
   const novelId = req.params.novelId;
   const userId = req.params.userId;
@@ -301,6 +308,59 @@ router.get('/get/favoriteById/:userId', (req, res) => {
     } else {
       res.send(results);
     }
+  });
+});
+
+router.get('/get/newChapters', (req, res) => {
+  const sql = `SELECT c.* , v.volume_title, n.novel_id, n.title as novel_title, n.cover_image
+              FROM chapters AS c 
+              INNER JOIN volumes AS v ON c.volume_id = v.volume_id 
+              INNER JOIN novels AS n ON n.novel_id = v.novel_id
+              INNER JOIN (
+                SELECT MAX(c2.updated_at) as max_date, v2.novel_id
+                FROM chapters AS c2
+                INNER JOIN volumes AS v2 ON c2.volume_id = v2.volume_id
+                GROUP BY v2.novel_id
+              ) as m ON v.novel_id = m.novel_id AND c.updated_at = m.max_date
+              ORDER BY c.updated_at DESC`;
+  db.query(sql, (err, result) => {
+    if (err) throw err;
+    res.json(result);
+  });
+});
+
+router.get('/get/novelByTag/:tag', (req, res) => {
+  const { tag } = req.params;
+  const sql = `SELECT c.* , v.volume_title, n.novel_id, n.title as novel_title, n.cover_image
+                FROM chapters AS c 
+                INNER JOIN volumes AS v ON c.volume_id = v.volume_id 
+                INNER JOIN novels AS n ON n.novel_id = v.novel_id
+                INNER JOIN (
+                    SELECT MAX(c2.updated_at) as max_date, v2.novel_id
+                    FROM chapters AS c2
+                    INNER JOIN volumes AS v2 ON c2.volume_id = v2.volume_id
+                    GROUP BY v2.novel_id
+                ) as m ON v.novel_id = m.novel_id AND c.updated_at = m.max_date
+                INNER JOIN novel_genre AS ng ON ng.novel_id = n.novel_id
+                INNER JOIN novel_categories AS nc ON nc.category_id = ng.category_id AND nc.category_name = ?
+                ORDER BY c.updated_at DESC`;
+  db.query(sql, tag, (err, results) => {
+    if (err) {
+      console.log(err);
+      return res.status(500).send('Internal server error');
+    } else {
+      res.send(results);
+    }
+  });
+});
+
+router.get('/get/topRatings', function(req, res) {
+  db.query(`SELECT n.novel_id, n.title, n.cover_image, IFNULL(AVG(r.rating_value), 0) AS avg_rating
+            FROM novels AS n
+            LEFT JOIN ratings AS r ON n.novel_id = r.novel_id
+            GROUP BY n.novel_id`, function(error, results, fields) {
+    if (error) throw error;
+    res.send(results);
   });
 });
 
@@ -668,10 +728,11 @@ router.delete('/delete/volume/:id', (req, res) => {
 router.get('/get/chapterById/:id', (req, res) => {
   const chapterId = req.params.id;
 
-  db.query(`SELECT chapters.chapter_id, chapters.title, chapters.content, chapters.volume_id, volumes.volume_title
+  db.query(`SELECT chapters.chapter_id, chapters.title, chapters.content, chapters.volume_id, volumes.volume_title, audio.url
             FROM chapters 
             JOIN volumes ON chapters.volume_id = volumes.volume_id
-            WHERE chapter_id = ${chapterId}`, (err, chapterResult) => {
+            JOIN audio ON chapters.chapter_id = audio.chapter_id
+            WHERE chapters.chapter_id = ${chapterId}`, (err, chapterResult) => {
     if (err) {
       console.log(err);
       return res.status(500).send('Internal server error');
@@ -684,6 +745,7 @@ router.get('/get/chapterById/:id', (req, res) => {
         content: chapterResult[0].content,
         volume_title: chapterResult[0].volume_title,
         volume: chapterResult[0].volume_id,
+        audio: chapterResult[0].url,
       };
 
       res.send(chapter);
@@ -692,7 +754,7 @@ router.get('/get/chapterById/:id', (req, res) => {
 });
 
 router.post('/post/newChapter', (req, res) => {
-  const { title, content, volume } = req.body;
+  const { title, content, volume, audio } = req.body;
 
   db.query(`SELECT * FROM volumes WHERE volume_id = ${volume}`, (volumeErr, volumeResult) => {
     if (volumeErr) {
@@ -706,24 +768,55 @@ router.post('/post/newChapter', (req, res) => {
           console.log(err);
           return res.status(500).send('Internal server error');
         } else {
-          const newChapter = {
-            chapter_id: result.insertId,
-            title: title,
-            content: content,
-            volume: volume
-          };
-          res.status(200).json({ ok: true });
-        }
+          const chapter_id = result.insertId;
+          db.query(`INSERT INTO audio (chapter_id, title, url, created_at, updated_at) VALUES ('${chapter_id}', '${title}', '${audio}', NOW(), NOW())`, (err, result) => {
+            if (err) {
+              console.log(err);
+              return res.status(500).send('Internal server error');
+            } else {
+              console.log(`Inserted ${result.affectedRows} row(s) into audio.`);
+            }
+          });
+        res.status(200).json({ ok: true });
+    }
       });
     }
   });
 });
 
+// router.post('/post/newChapter', (req, res) => {
+//   const { title, content, volume } = req.body;
+
+//   db.query(`SELECT * FROM volumes WHERE volume_id = ${volume}`, (volumeErr, volumeResult) => {
+//     if (volumeErr) {
+//       console.log(volumeErr);
+//       return res.status(500).send('Internal server error');
+//     } else if (volumeResult.length === 0) {
+//       return res.status(404).send('Volume not found');
+//     } else {
+//       db.query(`INSERT INTO chapters (title, content, volume_id, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())`, [title, content, volume], (err, result) => {
+//         if (err) {
+//           console.log(err);
+//           return res.status(500).send('Internal server error');
+//         } else {
+//           const newChapter = {
+//             chapter_id: result.insertId,
+//             title: title,
+//             content: content,
+//             volume: volume
+//           };
+//           res.status(200).json({ ok: true });
+//         }
+//       });
+//     }
+//   });
+// });
+
 router.put('/put/chapter/:id', (req, res) => {
   const chapterId = req.params.id;
 
   // Lấy dữ liệu mới từ client
-  const { volume, title, content, } = req.body;
+  const { volume, title, content, audio } = req.body;
 
   db.query(
     `UPDATE chapters 
@@ -735,9 +828,23 @@ router.put('/put/chapter/:id', (req, res) => {
         console.log(err);
         return res.status(500).send('Internal server error');
       } else if (result.affectedRows === 0) {
-        return res.status(404).send('Volume not found');
+        return res.status(404).send('Chapter not found');
       } else {
-        res.status(200).json({ ok: true });
+        db.query(
+          `UPDATE audio 
+           SET title = ?, url = ?, updated_at = NOW()
+           WHERE chapter_id = ?`,
+          [title, audio, chapterId],
+          (audioErr, audioResult) => {
+            if (audioErr) {
+              console.log(audioErr);
+              return res.status(500).send('Internal server error');
+            } else {
+              console.log(`Updated ${audioResult.affectedRows} row(s) in audio.`);
+              res.status(200).json({ ok: true });
+            }
+          }
+        );
       }
     }
   );
