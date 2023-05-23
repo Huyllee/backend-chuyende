@@ -16,8 +16,8 @@ server.use(cors({
     origin:["http://localhost:4200"]
 }))
 
-const urlDB = `mysql://${process.env.MYSQLUSER}:${process.env.MYSQLPASSWORD}@${process.env.MYSQLHOST}:${process.env.MYSQLPORT}/${process.env.MYSQLDATABASE}`
-
+// const urlDB = `mysql://${process.env.MYSQLUSER}:${process.env.MYSQLPASSWORD}@${process.env.MYSQLHOST}:${process.env.MYSQLPORT}/${process.env.MYSQLDATABASE}`
+const urlDB = `mysql://root:NWr6163pMSWNjjxb6W27@containers-us-west-68.railway.app:7774/railway`
 
 // const dbUser = process.env.DB_USER;
 // const dbPassword = process.env.DB_PASSWORD;
