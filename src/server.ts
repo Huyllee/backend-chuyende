@@ -40,13 +40,13 @@ const urlDB = `mysql://root:NWr6163pMSWNjjxb6W27@containers-us-west-68.railway.a
 
 export const db = mysql.createConnection(urlDB)
 
-// db.connect(function(error: mysql.MysqlError) {
-//     if(error){
-//         console.log('Error Connecting to DB')
-//     }else{
-//         console.log('Succsessfully Connected to DB')
-//     }
-// });
+db.connect(function(error: mysql.MysqlError) {
+    if(error){
+        console.log('Error Connecting to DB')
+    }else{
+        console.log('Succsessfully Connected to DB')
+    }
+});
 
 
 // server.listen(port, () => {
