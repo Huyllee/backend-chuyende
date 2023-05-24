@@ -23,23 +23,23 @@ const urlDB = `mysql://${process.env.MYSQLUSER}:${process.env.MYSQLPASSWORD}@${p
 // const dbPassword = process.env.DB_PASSWORD;
 // const dbDatabase = process.env.DB_DATABASE;
 
-// const dbUser = process.env.DB_USER;
-// const dbPassword = process.env.DB_PASSWORD;
-// const dbHost = process.env.DB_HOST;
-// const dbPort = process.env.DB_PORT;
-// const dbName = process.env.DB_NAME;
+const dbUser = process.env.MYSQLUSER;
+const dbPassword = process.env.MYSQLPASSWORD;
+const dbHost = process.env.MYSQLHOST;
+const dbPort = process.env.MYSQLPORT;
+const dbName = process.env.MYSQLDATABASE;
 
 const port = parseInt(process.env.PORT || '5000', 10);
 const hostname = "0.0.0.0";
 
-// export const db = mysql.createConnection({
-//     host: 'localhost',
-//     user: dbUser,
-//     password: dbPassword,
-//     database: dbDatabase
-// })
+export const db = mysql.createConnection({
+    host: dbHost,
+    user: dbUser,
+    password: dbPassword,
+    database: dbName,
+})
 
-export const db = mysql.createConnection(urlDB)
+// export const db = mysql.createConnection(urlDB)
 
 // db.connect(function(error: mysql.MysqlError) {
 //     if(error){
