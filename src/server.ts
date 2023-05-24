@@ -41,16 +41,16 @@ const hostname = "0.0.0.0";
 
 export const db = mysql.createConnection(urlDB)
 
-db.connect(function(error: mysql.MysqlError) {
-    if(error){
-        console.log('Error Connecting to DB')
-    }else{
-        console.log('Succsessfully Connected to DB')
-    }
-});
+// db.connect(function(error: mysql.MysqlError) {
+//     if(error){
+//         console.log('Error Connecting to DB')
+//     }else{
+//         console.log('Succsessfully Connected to DB')
+//     }
+// });
 
 
-server.listen(port, hostname, () => {
+server.listen(port, () => {
     console.log("Website server on http://localhost:" + port)
 });
 
