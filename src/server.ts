@@ -32,14 +32,14 @@ const dbName = process.env.MYSQLDATABASE;
 const port = parseInt(process.env.PORT || '5000', 10);
 const hostname = "0.0.0.0";
 
-export const db = mysql.createConnection({
-    host: dbHost,
-    user: dbUser,
-    password: dbPassword,
-    database: dbName,
-})
+// export const db = mysql.createConnection({
+//     host: dbHost,
+//     user: dbUser,
+//     password: dbPassword,
+//     database: dbName,
+// })
 
-// export const db = mysql.createConnection(urlDB)
+export const db = mysql.createConnection(urlDB)
 
 // db.connect(function(error: mysql.MysqlError) {
 //     if(error){
