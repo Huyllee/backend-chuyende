@@ -13,11 +13,11 @@ server.use(express.json());
 
 server.use(cors({
     credentials: true,
-    origin:["http://localhost:4200"]
+    origin:["https://novel-web.netlify.app"]
 }))
 
-// const urlDB = `mysql://${process.env.MYSQLUSER}:${process.env.MYSQLPASSWORD}@${process.env.MYSQLHOST}:${process.env.MYSQLPORT}/${process.env.MYSQLDATABASE}`
-const urlDB = `mysql://root:NWr6163pMSWNjjxb6W27@containers-us-west-68.railway.app:7774/railway`
+const urlDB = `mysql://${process.env.MYSQLUSER}:${process.env.MYSQLPASSWORD}@${process.env.MYSQLHOST}:${process.env.MYSQLPORT}/${process.env.MYSQLDATABASE}`
+// const urlDB = `mysql://root:NWr6163pMSWNjjxb6W27@containers-us-west-68.railway.app:7774/railway`
 
 // const dbUser = process.env.DB_USER;
 // const dbPassword = process.env.DB_PASSWORD;
@@ -29,7 +29,8 @@ const urlDB = `mysql://root:NWr6163pMSWNjjxb6W27@containers-us-west-68.railway.a
 // const dbPort = process.env.DB_PORT;
 // const dbName = process.env.DB_NAME;
 
-// const port = dbPort;
+const port = parseInt(process.env.PORT || '5000', 10);
+const hostname = "0.0.0.0";
 
 // export const db = mysql.createConnection({
 //     host: 'localhost',
@@ -49,9 +50,9 @@ db.connect(function(error: mysql.MysqlError) {
 });
 
 
-// server.listen(port, () => {
-//     console.log("Website server on http://localhost:" + port)
-// });
+server.listen(port, hostname, () => {
+    console.log("Website server on http://localhost:" + port)
+});
 
 
 
